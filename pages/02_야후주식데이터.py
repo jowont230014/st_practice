@@ -5,33 +5,45 @@ import plotly.express as px
 from datetime import datetime, timedelta
 
 st.title("🌍 글로벌 시가총액 Top 10 기업 주가 변화 (최근 1년)")
-st.write("시가총액 상위 기업들의 최근 1년간 주가 흐름을 비교해봅니다.")
+st.write("시가총액 상위 기업들의 최근 1년간 주가 흐름을 비교합니다.")
 
-# → 시가총액 상위 10개 기업 (예시 티커)
+# 시가총액 상위 10개 기업 (예시)
 tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "BRK-B", "TSM", "AVGO"]
 
-# 기간 설정: 오늘 기준으로 1년 전부터
+# 기간 설정
 end_date = datetime.today()
 start_date = end_date - timedelta(days=365)
 
-# 여러 종목의 주가 데이터 가져오기
+# 데이터 수집
 data = {}
 for t in tickers:
-    st.write(f"데이터 가져오는 중… {t}")
-    df = yf.download(t, start=start_date, end=end_date, progress=False)["Adj Close"]
-    data[t] = df
+    try:
+        st.write(f"📈 {t} 데이터 불러오는 중...")
+        df = yf.download(t, start=start_date, end=end_date, progress=False)
+        if df.empty:
+            st.warning(f"⚠️ {t}: 데이터를 불러오지 못했습니다.")
+            continue
+        # 'Adj Close'가 없을 경우 'Close' 사용
+        col_name = "Adj Close" if "Adj Close" in df.columns else "Close"
+        data[t] = df[col_name]
+    except Exception as e:
+        st.error(f"❌ {t} 불러오기 실패: {e}")
 
-# 하나의 데이터프레임으로 합치기
+# 데이터 병합
+if not data:
+    st.error("데이터를 불러오지 못했습니다. 나중에 다시 시도해주세요.")
+    st.stop()
+
 df_all = pd.DataFrame(data)
-df_all = df_all.dropna(how="any")  # 결측치 있는 날 제거하거나 보간 가능
+df_all = df_all.dropna(how="any")
 
-# 시각화: 여러 라인으로 비교
+# 시각화
 fig = px.line(
     df_all,
     x=df_all.index,
     y=df_all.columns,
-    labels={"value": "주가(조정종가)", "variable": "티커"},
-    title="글로벌 시가총액 Top 10 기업 – 최근 1년 주가 흐름"
+    labels={"value": "주가 (USD)", "variable": "티커"},
+    title="글로벌 시가총액 Top 10 기업 – 최근 1년 주가 변화",
 )
-fig.update_layout(legend_title_text="기업 티커", xaxis_title="날짜", yaxis_title="주가 (USD)")
+fig.update_layout(xaxis_title="날짜", yaxis_title="주가 (USD)", legend_title_text="기업 티커")
 st.plotly_chart(fig, use_container_width=True)
